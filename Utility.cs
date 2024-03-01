@@ -6,7 +6,7 @@ namespace okx;
 
 public class Helper
 {
-    public static void PrintAtCenter(string str, string padding="-")
+    public static void PrintAtCenter(string str, string padding = "-")
     {
         var width = Console.WindowWidth;
         var len = str.Length;
@@ -14,4 +14,5 @@ public class Helper
         var right = width - len - left;
         Console.WriteLine($"{padding.PadLeft(left, padding[0])}{str}{padding.PadRight(right, padding[0])}");
     }
+
 }

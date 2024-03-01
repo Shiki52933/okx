@@ -45,6 +45,7 @@ public partial class Client
         }
 
         List<KLineResponse?> klineResponses = [];
+        List<Candle> candles = [];
 
         // 如有必要，分割时间段
         var onceLimit = 100;
@@ -61,6 +62,24 @@ public partial class Client
             {
                 var newBefore = (beforeMs + ms * (onceLimit * i - 1)).ToString();
                 var newAfter = Math.Min(beforeMs + ms * onceLimit * (i + 1), afterMs).ToString();
+                Console.Write(
+                    $"query from {Client.TimeStamp2ReadableTime(long.Parse(newBefore))} to {Client.TimeStamp2ReadableTime(long.Parse(newAfter))}"
+                    );
+                
+                // 检查数据库中是否已存在
+                // TODO: 逻辑错误，未返回从数据库中读取的数据
+                var realNewBefore = (long.Parse(newBefore) + ms).ToString();
+                if (DbManager.ExistCandles(instId, newAfter, realNewBefore, bar))
+                {
+                    candles.AddRange(DbManager.ReadCandles(instId, newAfter, realNewBefore, bar));
+                    Console.WriteLine(" exist in database");
+                    continue;
+                }
+                else
+                {
+                    Console.WriteLine();
+                }
+
                 var klineResponse = await RequestHistoryIndexKLineAsync(instId, newAfter, newBefore, bar, onceLimit);
                 klineResponses.Add(klineResponse);
 
@@ -80,8 +99,9 @@ public partial class Client
         return klineResponses.Where(k => k != null)
                              .Select(k => k!.ToCandles())
                              .SelectMany(k => k)
+                             .Union(candles)
                              .OrderBy(c => c.Timestamp)
-                             .Distinct()
+                             .DistinctBy(c => c.Timestamp)
                              .ToList();
     }
 
@@ -199,6 +219,10 @@ public partial class Client
         return ((DateTimeOffset)time).ToUnixTimeMilliseconds().ToString();
     }
 
+    public static string TimeStamp2ReadableTime(long timestamp)
+    {
+        return DateTimeOffset.FromUnixTimeMilliseconds(timestamp).DateTime.ToString();
+    }
     public static long Bar2ms(string bar)
     {
         var unit = bar[^1];
@@ -206,9 +230,9 @@ public partial class Client
         return unit switch
         {
             'm' => num * 60 * 1000,
-            'h' => num * 60 * 60 * 1000,
-            'd' => num * 24 * 60 * 60 * 1000,
-            'w' => num * 7 * 24 * 60 * 60 * 1000,
+            'H' => num * 60 * 60 * 1000,
+            'D' => num * 24 * 60 * 60 * 1000,
+            'W' => num * 7 * 24 * 60 * 60 * 1000,
             'M' => num * 30 * 24 * 60 * 60 * 1000,
             _ => throw new ArgumentException("bar unit not supported")
         };
